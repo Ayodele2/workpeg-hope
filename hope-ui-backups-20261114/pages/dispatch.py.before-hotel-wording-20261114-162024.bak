@@ -1,0 +1,688 @@
+
+"""HOPE Emergency Dispatch."""
+
+from workpeg.ui import (
+    App, State, Padding, Column, Row, Spacer, Text, Button, Table,
+    TableHeader, TableRow, TableCell, Modal, Form, Field, TextInput,
+    Select, Link, on_table_change, set_title, store, toast, workpeg,
+    required, navigate, biz_url, user,
+)
+
+from components import (
+    EmptyState, ErrorState, LoadingState, PageHeader,
+)
+
+
+TABLE_NAMESPACE = "emergencies"
+PAGE = 100
+
+
+class DispatchPage(App):
+    table = State("")
+    rows = State([])
+    limit = State(100)
+    more = State(False)
+    loading = State(True)
+    ready = State(False)
+    needs_setup = State(False)
+    setting_up = State(False)
+    error = State("")
+
+    adding = State(False)
+    saving = State(False)
+
+    phone = State("")
+    emergency_type = State("Medical emergency")
+    priority = State("High")
+    notes = State("")
+
+    preferred_language = State("English")
+    contact_consent = State("No")
+
+    async def on_mount(self):
+        store.page_title = "Emergency Dispatch"
+        set_title("Emergency Dispatch")
+        on_table_change(self.changed)
+        await self.load()
+
+    async def changed(self, event):
+        await self.load()
+
+    async def find_table(self):
+        tables = await workpeg.get_tables(TABLE_NAMESPACE)
+
+        if len(tables) > 0:
+            self.table = tables[0]["uuid"]
+        else:
+            self.table = ""
+
+        self.ready = self.table != ""
+        self.needs_setup = not self.ready
+
+    async def load(self):
+        try:
+            if self.table == "":
+                await self.find_table()
+
+            if self.table != "":
+                rows = await workpeg.get_rows(
+                    self.table,
+                    limit=self.limit,
+                )
+                self.rows = rows
+                self.more = len(rows) == self.limit
+
+            self.error = ""
+
+        except Exception as e:
+            self.error = e.message
+
+        self.loading = False
+
+    async def retry(self):
+        self.loading = True
+        await self.load()
+
+    async def show_more(self):
+        self.limit += PAGE
+        await self.load()
+
+    async def set_up(self):
+        if self.setting_up or not self.needs_setup:
+            return
+
+        self.setting_up = True
+
+        try:
+            made = await workpeg.create_table({
+                "name": "HOPE Emergency Cases",
+                "namespace": TABLE_NAMESPACE,
+                "permission": "760",
+                "columns": [
+                    {
+                        "id": "guest_name",
+                        "name": "Guest Name",
+                        "type": "text",
+                        "position": 1000,
+                        "required": True,
+                    },
+                    {
+                        "id": "phone",
+                        "name": "Phone Number",
+                        "type": "text",
+                        "position": 2000,
+                    },
+                    {
+                        "id": "emergency_type",
+                        "name": "Emergency Type",
+                        "type": "text",
+                        "position": 3000,
+                    },
+                    {
+                        "id": "location",
+                        "name": "Incident Location",
+                        "type": "text",
+                        "position": 4000,
+                        "required": True,
+                    },
+                    {
+                        "id": "priority",
+                        "name": "Priority",
+                        "type": "text",
+                        "position": 5000,
+                    },
+                    {
+                        "id": "notes",
+                        "name": "Notes",
+                        "type": "text",
+                        "position": 6000,
+                    },
+                    {
+                        "id": "status",
+                        "name": "Status",
+                        "type": "text",
+                        "position": 7000,
+                    },
+                ],
+            })
+
+            self.table = made["uuid"]
+            self.ready = True
+            self.needs_setup = False
+            toast("Emergency register created", kind="success")
+
+        except Exception as e:
+            await self.find_table()
+
+            if self.table == "":
+                toast(e.message, kind="danger")
+
+        self.setting_up = False
+
+    def open_add(self):
+        self.phone = ""
+        self.emergency_type = "Medical emergency"
+        self.priority = "High"
+        self.notes = ""
+        self.preferred_language = "English"
+        self.contact_consent = "No"
+        self.adding = True
+
+    def close_add(self):
+        self.adding = False
+
+    def set_phone(self, value):
+        self.phone = value
+
+    def set_emergency_type(self, value):
+        self.emergency_type = value
+
+    def set_priority(self, value):
+        self.priority = value
+
+    def set_notes(self, value):
+        self.notes = value
+
+    def set_preferred_language(self, value):
+        self.preferred_language = value
+
+    def set_contact_consent(self, value):
+        self.contact_consent = value
+
+    async def ensure_history_table(self):
+        tables = await workpeg.get_tables("emergency_history")
+
+        if len(tables) > 0:
+            return tables[0]["uuid"]
+
+        try:
+            made = await workpeg.create_table({
+                "name": "HOPE Emergency Response History",
+                "namespace": "emergency_history",
+                "permission": "760",
+                "columns": [
+                    {
+                        "id": "case_id",
+                        "name": "Emergency Case ID",
+                        "type": "text",
+                        "position": 1000,
+                        "required": True,
+                    },
+                    {
+                        "id": "event_type",
+                        "name": "Event Type",
+                        "type": "text",
+                        "position": 2000,
+                        "required": True,
+                    },
+                    {
+                        "id": "summary",
+                        "name": "Event Description",
+                        "type": "text",
+                        "position": 3000,
+                        "required": True,
+                    },
+                    {
+                        "id": "previous_value",
+                        "name": "Previous Value",
+                        "type": "text",
+                        "position": 4000,
+                    },
+                    {
+                        "id": "new_value",
+                        "name": "New Value",
+                        "type": "text",
+                        "position": 5000,
+                    },
+                    {
+                        "id": "actor_name",
+                        "name": "Staff Member",
+                        "type": "text",
+                        "position": 6000,
+                    },
+                    {
+                        "id": "actor_subject",
+                        "name": "Staff Identity",
+                        "type": "text",
+                        "position": 7000,
+                    },
+                ],
+            })
+
+            return made["uuid"]
+
+        except Exception as e:
+            tables = await workpeg.get_tables("emergency_history")
+
+            if len(tables) > 0:
+                return tables[0]["uuid"]
+
+            return ""
+    async def record_history(
+        self,
+        case_id,
+        event_type,
+        summary,
+        previous_value,
+        new_value,
+    ):
+        try:
+            history_table = await self.ensure_history_table()
+            if not history_table:
+                return "Could not create or find the emergency history table."
+
+            latest = await workpeg.get_rows(
+                history_table,
+                limit=1,
+                offset=0,
+            )
+
+            top = (
+                latest[0].get("position", 0)
+                if len(latest) > 0
+                else 0
+            )
+
+            await workpeg.add_row(history_table, {
+                "data": {
+                    "case_id": str(case_id),
+                    "event_type": event_type,
+                    "summary": summary,
+                    "previous_value": str(previous_value),
+                    "new_value": str(new_value),
+                    "actor_name": user.name or "Staff member",
+                    "actor_subject": user.subject or "",
+                },
+                "position": top + 1000,
+            })
+
+            return ""
+
+        except Exception as e:
+            return str(e)
+    
+    async def save(self, values):
+        if self.saving or not self.ready:
+            return
+
+        self.saving = True
+        top = self.rows[0]["position"] if len(self.rows) > 0 else 0
+
+        original_notes = values["notes"].strip()
+
+        guest_details = (
+            "ROOM NUMBER: " + values["room_number"].strip()
+            + "\nNEXT OF KIN: " + values["next_of_kin_name"].strip()
+            + "\nRELATIONSHIP: " + values["next_of_kin_relationship"].strip()
+            + "\nNEXT OF KIN PHONE: " + values["next_of_kin_phone"].strip()
+            + "\nPREFERRED LANGUAGE: " + self.preferred_language
+            + "\nCONSENT TO CONTACT: " + self.contact_consent
+        )
+
+        if original_notes != "":
+            stored_notes = (
+                original_notes
+                + "\n\n--- GUEST AND NEXT-OF-KIN DETAILS ---\n"
+                + guest_details
+            )
+        else:
+            stored_notes = (
+                "GUEST AND NEXT-OF-KIN DETAILS\n"
+                + guest_details
+            )
+
+        try:
+            created = await workpeg.add_row(self.table, {
+                "data": {
+                    "guest_name": values["guest_name"],
+                    "phone": self.phone,
+                    "emergency_type": self.emergency_type,
+                    "location": values["location"],
+                    "priority": self.priority,
+                    "notes": stored_notes,
+                    "status": "received",
+                },
+                "position": top + 1000,
+            })
+
+        except Exception as e:
+            toast(str(e), kind="danger")
+            self.saving = False
+            return
+
+        self.adding = False
+        toast("Emergency case recorded", kind="success")
+
+        case_id = created.get("id", "")
+
+        if case_id:
+            history_error = await self.record_history(
+                case_id,
+                "created",
+                "Emergency case registered",
+                "",
+                "received",
+            )
+
+            if history_error:
+                toast(
+                    "Emergency was saved, but its history could not be recorded: "
+                    + history_error,
+                    kind="danger",
+                )
+        else:
+            toast(
+                "Emergency was saved, but its history could not be recorded because the new record ID was not returned.",
+                kind="danger",
+            )
+
+        await self.load()
+        self.saving = False
+
+    def build(self):
+        return Padding(
+            Column(
+                PageHeader(
+                    "Emergency Dispatch",
+                    "Register, monitor and coordinate emergency responses.",
+                    Button(
+                        "Report emergency",
+                        icon="plus",
+                        on_click=self.open_add,
+                        visible=self.ready,
+                    ),
+                ),
+                self.summary(),
+                self.body(),
+                Modal(
+                    self.add_form(),
+                    open=self.adding,
+                    on_close=self.close_add,
+                    title="Report a new emergency",
+                ),
+                gap=24,
+            ),
+            all=24,
+        )
+
+    def summary(self):
+        return Row(
+            Column(
+                Text("Total cases", variant="muted"),
+                Text(str(len(self.rows)), variant="heading"),
+                gap=8,
+            ),
+            Column(
+                Text("Awaiting assignment", variant="muted"),
+                Text(
+                    str(len([
+                        r for r in self.rows
+                        if r["data"].get("status", "received") == "received"
+                    ])),
+                    variant="heading",
+                ),
+                gap=8,
+            ),
+            Column(
+                Text("Active responses", variant="muted"),
+                Text(
+                    str(len([
+                        r for r in self.rows
+                        if r["data"].get("status", "") in [
+                            "assigned", "responding", "arrived"
+                        ]
+                    ])),
+                    variant="heading",
+                ),
+                gap=8,
+            ),
+            gap=12,
+        )
+
+    def body(self):
+        if self.loading:
+            return LoadingState("Loading emergency cases...")
+
+        elif self.error != "":
+            return ErrorState(
+                self.error,
+                Button(
+                    "Try again",
+                    variant="outline-gray",
+                    icon="refresh",
+                    on_click=self.retry,
+                ),
+            )
+
+        elif self.needs_setup and self.setting_up:
+            return EmptyState(
+                "alert-triangle",
+                "Preparing emergency dispatch",
+                "Creating HOPE's emergency case register.",
+                Button("Setting up...", disabled=True),
+            )
+
+        elif self.needs_setup:
+            return EmptyState(
+                "alert-triangle",
+                "Emergency register not set up",
+                "Create the emergency register for this business.",
+                Button(
+                    "Set up emergency dispatch",
+                    icon="plus",
+                    on_click=self.set_up,
+                ),
+            )
+
+        elif len(self.rows) == 0:
+            return EmptyState(
+                "alert-triangle",
+                "No emergency cases recorded",
+                "Report an emergency to create the first case.",
+                Button(
+                    "Report emergency",
+                    icon="plus",
+                    on_click=self.open_add,
+                ),
+            )
+
+        else:
+            return Table(
+                TableHeader(
+                    TableCell(title="Guest"),
+                    TableCell(title="Emergency"),
+                    TableCell(title="Location"),
+                    TableCell(title="Priority"),
+                    TableCell(title="Status"),
+                ),
+                *[
+                    TableRow(
+                        TableCell(
+                            Link(
+                                r["data"].get("guest_name", "Unnamed case"),
+                                href=biz_url(
+                                    "/dispatch/" + str(r["id"])
+                                ),
+                            )
+                        ),
+                        TableCell(
+                            Text(
+                                r["data"].get("emergency_type", ""),
+                                variant="muted",
+                            )
+                        ),
+                        TableCell(
+                            Text(
+                                r["data"].get("location", ""),
+                                variant="muted",
+                            )
+                        ),
+                        TableCell(
+                            Text(
+                                r["data"].get("priority", "High").upper()
+                            )
+                        ),
+                        TableCell(
+                            Text(
+                                r["data"].get("status", "received").upper(),
+                                weight="medium",
+                            )
+                        ),
+                    )
+                    for r in self.rows
+                ],
+                search="Search emergency cases",
+                sortable=True,
+                footer=self.footer(),
+            )
+
+    def footer(self):
+        if self.more:
+            return Row(
+                Text(
+                    f"Showing the first {len(self.rows)} cases",
+                    variant="caption",
+                ),
+                Spacer(),
+                Button(
+                    "Show more",
+                    variant="outline-gray",
+                    size="sm",
+                    on_click=self.show_more,
+                ),
+                align="center",
+            )
+
+        else:
+            return Text(
+                f"{len(self.rows)} emergency cases",
+                variant="caption",
+            )
+
+    def submit_button(self):
+        if self.saving:
+            return Button("Recording...", disabled=True)
+        else:
+            return Button("Record emergency", kind="submit")
+
+    def add_form(self):
+        return Form(
+            Text(
+                "GUEST INFORMATION",
+                weight="semibold",
+            ),
+            Field(
+                "guest_name",
+                TextInput(autofocus=True),
+                label="Guest or patient name",
+                validators=[required],
+            ),
+            Field(
+                "room_number",
+                TextInput(),
+                label="Hotel room number",
+            ),
+            Field(
+                "phone",
+                TextInput(
+                    value=self.phone,
+                    on_change=self.set_phone,
+                ),
+                label="Guest contact phone number",
+            ),
+            Select(
+                options=[
+                    {"value": "Medical emergency", "label": "Medical emergency"},
+                    {"value": "Accident or injury", "label": "Accident or injury"},
+                    {"value": "Breathing difficulty", "label": "Breathing difficulty"},
+                    {"value": "Unconscious person", "label": "Unconscious person"},
+                    {"value": "Other", "label": "Other"},
+                ],
+                value=self.emergency_type,
+                on_change=self.set_emergency_type,
+                label="Emergency type",
+            ),
+            Field(
+                "location",
+                TextInput(),
+                label="Exact incident location",
+                validators=[required],
+            ),
+            Select(
+                options=[
+                    {"value": "Critical", "label": "Critical"},
+                    {"value": "High", "label": "High"},
+                    {"value": "Medium", "label": "Medium"},
+                    {"value": "Low", "label": "Low"},
+                ],
+                value=self.priority,
+                on_change=self.set_priority,
+                label="Priority",
+            ),
+            Text(
+                "NEXT-OF-KIN INFORMATION",
+                weight="semibold",
+            ),
+            Field(
+                "next_of_kin_name",
+                TextInput(),
+                label="Next-of-kin full name",
+            ),
+            Field(
+                "next_of_kin_relationship",
+                TextInput(),
+                label="Relationship to guest",
+            ),
+            Field(
+                "next_of_kin_phone",
+                TextInput(),
+                label="Next-of-kin phone number",
+            ),
+            Select(
+                options=[
+                    {"value": "English", "label": "English"},
+                    {"value": "Yoruba", "label": "Yoruba"},
+                    {"value": "Hausa", "label": "Hausa"},
+                ],
+                value=self.preferred_language,
+                on_change=self.set_preferred_language,
+                label="Preferred language",
+            ),
+            Select(
+                options=[
+                    {"value": "No", "label": "No consent recorded"},
+                    {"value": "Yes", "label": "Guest has consented"},
+                ],
+                value=self.contact_consent,
+                on_change=self.set_contact_consent,
+                label="Permission to contact next of kin",
+            ),
+            Text(
+                "Do not contact the next of kin unless the required "
+                "consent or other lawful authorisation has been verified.",
+                variant="muted",
+            ),
+            Text(
+                "ADDITIONAL EMERGENCY INFORMATION",
+                weight="semibold",
+            ),
+            Field(
+                "notes",
+                TextInput(
+                    value=self.notes,
+                    on_change=self.set_notes,
+                ),
+                label="Additional information",
+            ),
+            Row(
+                Spacer(),
+                Button(
+                    "Cancel",
+                    variant="outline-gray",
+                    on_click=self.close_add,
+                ),
+                self.submit_button(),
+                gap=8,
+            ),
+            on_submit=self.save,
+        )

@@ -1,16 +1,17 @@
 
-"""HOPE Emergency Dispatch."""
+"""HOPE Hotel Emergency Response Register."""
 
 from workpeg.ui import (
     App, State, Padding, Column, Row, Spacer, Text, Button, Table,
     TableHeader, TableRow, TableCell, Modal, Form, Field, TextInput,
     Select, Link, on_table_change, set_title, store, toast, workpeg,
-    required, navigate, biz_url,
+    required, navigate, biz_url, user,
 )
 
 from components import (
     EmptyState, ErrorState, LoadingState, PageHeader,
 )
+
 
 TABLE_NAMESPACE = "emergencies"
 PAGE = 100
@@ -39,8 +40,8 @@ class DispatchPage(App):
     contact_consent = State("No")
 
     async def on_mount(self):
-        store.page_title = "Emergency Dispatch"
-        set_title("Emergency Dispatch")
+        store.page_title = "Hotel Emergency Response"
+        set_title("Hotel Emergency Response")
         on_table_change(self.changed)
         await self.load()
 
@@ -94,7 +95,7 @@ class DispatchPage(App):
 
         try:
             made = await workpeg.create_table({
-                "name": "HOPE Emergency Cases",
+                "name": "Hotel Emergency Cases",
                 "namespace": TABLE_NAMESPACE,
                 "permission": "760",
                 "columns": [
@@ -188,6 +189,118 @@ class DispatchPage(App):
     def set_contact_consent(self, value):
         self.contact_consent = value
 
+    async def ensure_history_table(self):
+        tables = await workpeg.get_tables("emergency_history")
+
+        if len(tables) > 0:
+            return tables[0]["uuid"]
+
+        try:
+            made = await workpeg.create_table({
+                "name": "HOPE Emergency Response History",
+                "namespace": "emergency_history",
+                "permission": "760",
+                "columns": [
+                    {
+                        "id": "case_id",
+                        "name": "Emergency Case ID",
+                        "type": "text",
+                        "position": 1000,
+                        "required": True,
+                    },
+                    {
+                        "id": "event_type",
+                        "name": "Event Type",
+                        "type": "text",
+                        "position": 2000,
+                        "required": True,
+                    },
+                    {
+                        "id": "summary",
+                        "name": "Event Description",
+                        "type": "text",
+                        "position": 3000,
+                        "required": True,
+                    },
+                    {
+                        "id": "previous_value",
+                        "name": "Previous Value",
+                        "type": "text",
+                        "position": 4000,
+                    },
+                    {
+                        "id": "new_value",
+                        "name": "New Value",
+                        "type": "text",
+                        "position": 5000,
+                    },
+                    {
+                        "id": "actor_name",
+                        "name": "Staff Member",
+                        "type": "text",
+                        "position": 6000,
+                    },
+                    {
+                        "id": "actor_subject",
+                        "name": "Staff Identity",
+                        "type": "text",
+                        "position": 7000,
+                    },
+                ],
+            })
+
+            return made["uuid"]
+
+        except Exception as e:
+            tables = await workpeg.get_tables("emergency_history")
+
+            if len(tables) > 0:
+                return tables[0]["uuid"]
+
+            return ""
+    async def record_history(
+        self,
+        case_id,
+        event_type,
+        summary,
+        previous_value,
+        new_value,
+    ):
+        try:
+            history_table = await self.ensure_history_table()
+            if not history_table:
+                return "Could not create or find the emergency history table."
+
+            latest = await workpeg.get_rows(
+                history_table,
+                limit=1,
+                offset=0,
+            )
+
+            top = (
+                latest[0].get("position", 0)
+                if len(latest) > 0
+                else 0
+            )
+
+            await workpeg.add_row(history_table, {
+                "data": {
+                    "case_id": str(case_id),
+                    "event_type": event_type,
+                    "summary": summary,
+                    "previous_value": str(previous_value),
+                    "new_value": str(new_value),
+                    "actor_name": user.name or "Staff member",
+                    "actor_subject": user.subject or "",
+                },
+                "position": top + 1000,
+            })
+
+            return ""
+
+        except Exception as e:
+            return str(e)
+    
     async def save(self, values):
         if self.saving or not self.ready:
             return
@@ -219,7 +332,7 @@ class DispatchPage(App):
             )
 
         try:
-            await workpeg.add_row(self.table, {
+            created = await workpeg.add_row(self.table, {
                 "data": {
                     "guest_name": values["guest_name"],
                     "phone": self.phone,
@@ -232,21 +345,46 @@ class DispatchPage(App):
                 "position": top + 1000,
             })
 
-            self.adding = False
-            toast("Emergency case recorded", kind="success")
-            await self.load()
-
         except Exception as e:
-            toast(e.message, kind="danger")
+            toast(str(e), kind="danger")
+            self.saving = False
+            return
 
+        self.adding = False
+        toast("Emergency case recorded", kind="success")
+
+        case_id = created.get("id", "")
+
+        if case_id:
+            history_error = await self.record_history(
+                case_id,
+                "created",
+                "Emergency case registered",
+                "",
+                "received",
+            )
+
+            if history_error:
+                toast(
+                    "Emergency was saved, but its history could not be recorded: "
+                    + history_error,
+                    kind="danger",
+                )
+        else:
+            toast(
+                "Emergency was saved, but its history could not be recorded because the new record ID was not returned.",
+                kind="danger",
+            )
+
+        await self.load()
         self.saving = False
 
     def build(self):
         return Padding(
             Column(
                 PageHeader(
-                    "Emergency Dispatch",
-                    "Register, monitor and coordinate emergency responses.",
+                    "Hotel Emergency Response",
+                    "Record guest emergencies and coordinate the hotel response while qualified medical help is sought.",
                     Button(
                         "Report emergency",
                         icon="plus",
@@ -328,7 +466,7 @@ class DispatchPage(App):
             return EmptyState(
                 "alert-triangle",
                 "Emergency register not set up",
-                "Create the emergency register for this business.",
+                "Create the emergency case register for this hotel workspace.",
                 Button(
                     "Set up emergency dispatch",
                     icon="plus",

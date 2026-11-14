@@ -1,5 +1,5 @@
 
-"""HOPE Command Centre."""
+"""HOPE Hotel Emergency Response Centre."""
 
 from workpeg.ui import (
     App, State, Padding, Column, Row, Container, Expanded,
@@ -37,8 +37,8 @@ class HomePage(App):
     ambulance_count = State(0)
 
     async def on_mount(self):
-        store.page_title = "Command Centre"
-        set_title("HOPE | Command Centre")
+        store.page_title = "Hotel Response Centre"
+        set_title("HOPE | Hotel Response Centre")
         on_table_change(self.changed)
         await self.load()
 
@@ -358,7 +358,7 @@ class HomePage(App):
 
     def build(self):
         if self.loading:
-            return LoadingState("Loading HOPE Command Centre...")
+            return LoadingState("Loading Hotel Response Centre...")
 
         elif self.error != "":
             return Padding(
@@ -376,10 +376,10 @@ class HomePage(App):
             return Padding(
                 Column(
                     PageHeader(
-                        "Command Centre",
-                        "Emergency coordination and operational overview.",
+                        "Hotel Emergency Response Centre",
+                        "Monitor guest emergencies, staff response and available medical resources.",
                         Link(
-                            "View all emergencies",
+                            "View emergency register",
                             href=biz_url("/dispatch"),
                         ),
                     ),
@@ -389,7 +389,7 @@ class HomePage(App):
                             Expanded(
                                 Column(
                                     Text(
-                                        "HOPE development environment",
+                                        "HOPE hotel-response demonstration",
                                         weight="semibold",
                                     ),
                                     Text(

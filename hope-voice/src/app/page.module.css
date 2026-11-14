@@ -1,0 +1,393 @@
+﻿.page {
+  min-height: 100vh;
+  background: #f5f8f7;
+  color: #142b29;
+}
+
+.header {
+  height: 76px;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e4ece9;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #123d37;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.7px;
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 35px;
+  height: 35px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: #087e70;
+  color: white;
+  font-size: 19px;
+}
+
+.brandLight {
+  font-weight: 500;
+  color: #64817b;
+}
+
+.headerTag, .eyebrow, .sectionLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+}
+
+.headerTag {
+  color: #718681;
+}
+
+.hero {
+  width: min(100% - 40px, 700px);
+  margin: 0 auto;
+  padding: 70px 0 55px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #087e70;
+}
+
+.eyebrowDot, .statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #12a58e;
+}
+
+.hero h1 {
+  margin: 23px 0 14px;
+  font-size: clamp(43px, 7vw, 66px);
+  line-height: 1.04;
+  letter-spacing: -3.5px;
+  font-weight: 750;
+}
+
+.hero h1 span {
+  color: #078675;
+}
+
+.intro {
+  max-width: 570px;
+  color: #607571;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.emergencyNotice {
+  margin: 30px 0 25px;
+  padding: 17px 19px;
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  border: 1px solid #f0d8b5;
+  border-radius: 13px;
+  background: #fff9ef;
+}
+
+.noticeIcon {
+  flex: 0 0 23px;
+  height: 23px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #a65d12;
+  color: white;
+  font-weight: 800;
+}
+
+.emergencyNotice strong {
+  color: #71420f;
+  font-size: 13px;
+}
+
+.emergencyNotice p {
+  margin: 5px 0 0;
+  color: #886b48;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.callCard, .transcript {
+  padding: 25px;
+  border: 1px solid #e1eae6;
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 12px 35px rgba(22, 61, 52, 0.045);
+}
+
+.callTop, .transcriptHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.sectionLabel {
+  color: #8aa09a;
+  font-size: 9px;
+}
+
+.callTop h2, .transcriptHeading h2 {
+  margin: 7px 0 0;
+  font-size: 20px;
+  letter-spacing: -0.6px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 30px;
+  background: #f0f5f3;
+  color: #60746e;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status .statusDot {
+  width: 6px;
+  height: 6px;
+  background: #8a9c96;
+}
+
+.active .statusDot, .ready .statusDot {
+  background: #0b9c7e;
+}
+
+.connecting .statusDot {
+  background: #d28b22;
+}
+
+.error .statusDot {
+  background: #c64c4c;
+}
+
+.voiceVisual {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+}
+
+.orb {
+  width: 112px;
+  height: 112px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, #e4f5ef 0%, #d2eee5 55%, #edf7f3 72%);
+  box-shadow: 0 0 0 12px #f5faf8, 0 0 0 13px #eaf3ef;
+}
+
+.orbActive {
+  box-shadow: 0 0 0 12px #f0faf6, 0 0 0 14px #ccebe0, 0 0 0 25px #f5faf8;
+}
+
+.orbCore {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  border-radius: 19px;
+  background: #087e70;
+  color: white;
+  font-size: 29px;
+  font-weight: 800;
+}
+
+.voiceVisual p {
+  margin: 0;
+  color: #70847e;
+  font-size: 12px;
+  text-align: center;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.startButton, .endButton, .secondaryButton {
+  min-height: 47px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.startButton {
+  min-width: 220px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #087e70;
+  color: white;
+}
+
+.startButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.startButton:not(:disabled):hover, .endButton:hover, .secondaryButton:hover {
+  transform: translateY(-1px);
+}
+
+.endButton {
+  background: #a93232;
+  color: white;
+}
+
+.secondaryButton {
+  background: #edf4f1;
+  color: #28564c;
+}
+
+.helper, .error {
+  margin: 15px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.helper {
+  color: #778a84;
+}
+
+.helper code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #edf3f0;
+}
+
+.error {
+  color: #b33b3b;
+}
+
+.transcript {
+  margin-top: 18px;
+}
+
+.privacyTag {
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: #f0f6f3;
+  color: #638078;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.emptyTranscript {
+  margin: 25px 0 4px;
+  color: #8a9a95;
+  font-size: 12px;
+  text-align: center;
+}
+
+.transcriptList {
+  max-height: 280px;
+  overflow-y: auto;
+  margin-top: 20px;
+}
+
+.transcriptLine {
+  padding: 13px 0;
+  border-top: 1px solid #edf1ef;
+}
+
+.speaker {
+  color: #078675;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.transcriptLine p {
+  margin: 5px 0 0;
+  color: #526963;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.disclaimer {
+  margin-top: 20px;
+  color: #879690;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.disclaimer strong {
+  color: #63756e;
+}
+
+.footer {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 22px 28px;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #e4ece9;
+  color: #8a9a95;
+  font-size: 10px;
+}
+
+@media (max-width: 560px) {
+  .header {
+    height: 65px;
+    padding: 0 19px;
+  }
+
+  .headerTag {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+
+  .hero {
+    width: min(100% - 32px, 700px);
+    padding-top: 48px;
+  }
+
+  .hero h1 {
+    letter-spacing: -2.5px;
+  }
+
+  .callCard, .transcript {
+    padding: 19px;
+  }
+
+  .callTop {
+    flex-direction: column;
+  }
+
+  .footer {
+    padding: 20px 17px;
+    gap: 12px;
+    font-size: 9px;
+  }
+}

@@ -22,26 +22,26 @@ class AppShell(Shell):
     def build(self):
         return Scaffold(
             NavSection(
-                "Operations",
+                "Hotel Operations",
                 NavItem(
-                    "Command Centre",
+                    "Response Overview",
                     biz_url("/"),
                     icon="layout-dashboard",
                 ),
                 NavItem(
-                    "Emergency Dispatch",
+                    "Guest Emergencies",
                     biz_url("/dispatch"),
                     icon="alert-triangle",
                 ),
                 NavItem(
-                    "Response Resources",
+                    "Medical Resources",
                     biz_url("/resources"),
                     icon="building-2",
                 ),
             ),
             fixed=NavFixed(
                 NavItem(
-                    "Home",
+                    "Hotel Home",
                     biz_url("/"),
                     icon="home",
                 ),

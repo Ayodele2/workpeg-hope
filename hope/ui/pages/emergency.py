@@ -4,7 +4,9 @@
 from workpeg.ui import (
     App, State, Padding, Column, Row, Container, Spacer,
     Text, Button, Select, Divider, Link, ListView,
-    biz_url, route, navigate, set_title, store, toast, workpeg,
+    Table, TableHeader, TableRow, TableCell,
+    biz_url, dates, route, navigate, set_title, store,
+    toast, workpeg, user,
 )
 
 from components import ErrorState, LoadingState
@@ -37,6 +39,9 @@ class EmergencyCasePage(App):
     selected_ambulance = State("")
     hospital_name = State("")
     ambulance_name = State("")
+    history_events = State([])
+    history_error = State("")
+    history_has_more = State(False)
 
     async def on_mount(self):
         store.page_title = "Emergency Case"
@@ -66,6 +71,7 @@ class EmergencyCasePage(App):
                     self.error = "The emergency record has no data field."
                 else:
                     self.show(record)
+                    await self.load_history()
 
         except Exception as e:
             self.error = str(e)
@@ -73,6 +79,8 @@ class EmergencyCasePage(App):
         await self.load_resources()
         self.loading = False
 
+    def back(self):
+        navigate(biz_url("/dispatch"))
     def show(self, row):
         self.row = row
         data = row["data"]
@@ -93,6 +101,264 @@ class EmergencyCasePage(App):
         self.ambulance_name = data.get("ambulance_name", "")
 
         set_title("Emergency case " + str(self.emergency_id))
+
+
+    async def ensure_history_table(self):
+        tables = await workpeg.get_tables("emergency_history")
+
+        if len(tables) > 0:
+            return tables[0]["uuid"]
+
+        try:
+            made = await workpeg.create_table({
+                "name": "HOPE Emergency Response History",
+                "namespace": "emergency_history",
+                "permission": "760",
+                "columns": [
+                    {
+                        "id": "case_id",
+                        "name": "Emergency Case ID",
+                        "type": "text",
+                        "position": 1000,
+                        "required": True,
+                    },
+                    {
+                        "id": "event_type",
+                        "name": "Event Type",
+                        "type": "text",
+                        "position": 2000,
+                        "required": True,
+                    },
+                    {
+                        "id": "summary",
+                        "name": "Event Description",
+                        "type": "text",
+                        "position": 3000,
+                        "required": True,
+                    },
+                    {
+                        "id": "previous_value",
+                        "name": "Previous Value",
+                        "type": "text",
+                        "position": 4000,
+                    },
+                    {
+                        "id": "new_value",
+                        "name": "New Value",
+                        "type": "text",
+                        "position": 5000,
+                    },
+                    {
+                        "id": "actor_name",
+                        "name": "Staff Member",
+                        "type": "text",
+                        "position": 6000,
+                    },
+                    {
+                        "id": "actor_subject",
+                        "name": "Staff Identity",
+                        "type": "text",
+                        "position": 7000,
+                    },
+                ],
+            })
+            return made["uuid"]
+
+        except Exception:
+            tables = await workpeg.get_tables("emergency_history")
+
+            if len(tables) > 0:
+                return tables[0]["uuid"]
+
+            return ""
+
+    async def record_history(
+        self,
+        case_id,
+        event_type,
+        summary,
+        previous_value,
+        new_value,
+    ):
+        try:
+            history_table = await self.ensure_history_table()
+
+            if not history_table:
+                return "Could not create or find the emergency history table."
+
+            latest = await workpeg.get_rows(
+                history_table,
+                limit=1,
+                offset=0,
+            )
+
+            top = (
+                latest[0].get("position", 0)
+                if len(latest) > 0
+                else 0
+            )
+
+            await workpeg.add_row(history_table, {
+                "data": {
+                    "case_id": str(case_id),
+                    "event_type": event_type,
+                    "summary": summary,
+                    "previous_value": str(previous_value),
+                    "new_value": str(new_value),
+                    "actor_name": user.name or "Staff member",
+                    "actor_subject": user.subject or "",
+                },
+                "position": top + 1000,
+            })
+
+            return ""
+
+        except Exception as e:
+            return str(e)
+
+    async def load_history(self):
+        self.history_error = ""
+        self.history_has_more = False
+        self.history_events = []
+
+        try:
+            tables = await workpeg.get_tables("emergency_history")
+
+            if len(tables) == 0:
+                return
+
+            history_table = tables[0]["uuid"]
+            history_rows = []
+            scan_complete = False
+
+            for page in range(10):
+                if not scan_complete and not self.history_has_more:
+                    rows = await workpeg.get_rows(
+                        history_table,
+                        limit=100,
+                        offset=page * 100,
+                    )
+
+                    for event in rows:
+                        data = event.get("data", {})
+
+                        if (
+                            data.get("case_id", "") == str(self.emergency_id)
+                            and len(history_rows) < 100
+                        ):
+                            created_at = event.get("created_at", "")
+                            occurred_at = "Time unavailable"
+
+                            if created_at:
+                                occurred_at = dates.format(
+                                    dates.to_epoch(created_at[:19], "UTC"),
+                                    "medium",
+                                )
+
+                            history_rows.append({
+                                "event_type": data.get("event_type", "event"),
+                                "summary": data.get("summary", ""),
+                                "previous_value": data.get("previous_value", ""),
+                                "new_value": data.get("new_value", ""),
+                                "actor_name": data.get("actor_name", "Staff member"),
+                                "occurred_at": occurred_at,
+                            })
+
+                    if len(history_rows) >= 100:
+                        self.history_has_more = True
+
+                    if len(rows) < 100:
+                        scan_complete = True
+
+                    if page == 9 and len(rows) == 100:
+                        self.history_has_more = True
+
+            self.history_events = history_rows
+
+        except Exception as e:
+            self.history_error = str(e)
+    def history_panel(self):
+        if self.history_error != "":
+            return Container(
+                Column(
+                    Text("Response history", weight="semibold"),
+                    Divider(),
+                    Text(
+                        "History could not be loaded: " + self.history_error,
+                        variant="muted",
+                    ),
+                    gap=12,
+                ),
+                variant="card",
+                padding=24,
+            )
+
+        if len(self.history_events) == 0:
+            return Container(
+                Column(
+                    Text("Response history", weight="semibold"),
+                    Divider(),
+                    Text(
+                        "No response history has been recorded for this case yet.",
+                        variant="muted",
+                    ),
+                    gap=12,
+                ),
+                variant="card",
+                padding=24,
+            )
+
+        return Container(
+            Column(
+                Text("Response history", weight="semibold"),
+                Text(
+                    "Latest activity first.",
+                    variant="muted",
+                ),
+                Divider(),
+                *[
+                    Container(
+                        Column(
+                            Text(
+                                event["event_type"].upper(),
+                                weight="semibold",
+                            ),
+                            Text(event["summary"]),
+                            Text(
+                                "Previous: " + (
+                                    event["previous_value"] or "Not recorded"
+                                ),
+                                variant="muted",
+                            ),
+                            Text(
+                                "New: " + (
+                                    event["new_value"] or "Not recorded"
+                                ),
+                                variant="muted",
+                            ),
+                            Text(
+                                "Staff: " + event["actor_name"],
+                                variant="caption",
+                            ),
+                            Text(
+                                event["occurred_at"],
+                                variant="caption",
+                            ),
+                            gap=4,
+                        ),
+                        padding=12,
+                        variant="outline",
+                    )
+                    for event in self.history_events
+                ],
+                Text(
+                    "History scan limit reached. Older events may not be shown."
+                ) if self.history_has_more else Spacer(),
+                gap=12,
+            ),
+            variant="card",
+            padding=24,
+        )
 
     async def load_resources(self):
         try:
@@ -172,6 +438,7 @@ class EmergencyCasePage(App):
     def set_status(self, value):
         self.status = value
 
+    
     async def save_assignment(self):
         if self.saving or not self.row:
             return
@@ -185,10 +452,27 @@ class EmergencyCasePage(App):
             return
 
         self.saving = True
+
+        old_data = self.row["data"]
+        previous_hospital_id = str(old_data.get("hospital_id", "") or "")
+        previous_ambulance_id = str(old_data.get("ambulance_id", "") or "")
+        previous_status = old_data.get("status", "received")
+
+        assignment_changed = (
+            previous_hospital_id != self.selected_hospital
+            or previous_ambulance_id != self.selected_ambulance
+        )
+
+        previous_assignment = (
+            (old_data.get("hospital_name", "") or "Unassigned")
+            + " / "
+            + (old_data.get("ambulance_name", "") or "Unassigned")
+        )
+
         data = {}
 
-        for key in self.row["data"]:
-            data[key] = self.row["data"][key]
+        for key in old_data:
+            data[key] = old_data[key]
 
         data["hospital_id"] = self.selected_hospital
         data["hospital_name"] = self.hospital_name
@@ -196,7 +480,7 @@ class EmergencyCasePage(App):
         data["ambulance_name"] = self.ambulance_name
         data["assignment_type"] = "demo"
 
-        if data.get("status", "received") == "received":
+        if previous_status == "received":
             data["status"] = "assigned"
 
         try:
@@ -207,8 +491,48 @@ class EmergencyCasePage(App):
             )
 
             self.show(updated)
+
+            if assignment_changed:
+                event_type = (
+                    "reassignment"
+                    if previous_hospital_id != ""
+                    or previous_ambulance_id != ""
+                    else "assignment"
+                )
+
+                new_assignment = (
+                    self.hospital_name + " / " + self.ambulance_name
+                )
+
+                audit_error = await self.record_history(
+                    str(self.emergency_id),
+                    event_type,
+                    "Demo hospital and ambulance assignment recorded.",
+                    previous_assignment,
+                    new_assignment,
+                )
+
+                if audit_error:
+                    toast("Assignment saved, but history failed: " + audit_error,
+                          kind="danger")
+
+            if previous_status != data["status"]:
+                audit_error = await self.record_history(
+                    str(self.emergency_id),
+                    "status",
+                    "Emergency status changed.",
+                    previous_status,
+                    data["status"],
+                )
+
+                if audit_error:
+                    toast("Status saved, but history failed: " + audit_error,
+                          kind="danger")
+
+            await self.load_history()
+
             toast(
-                "Demo hospital and ambulance assigned successfully",
+                "Demo hospital and ambulance assignment saved.",
                 kind="success",
             )
 
@@ -217,17 +541,22 @@ class EmergencyCasePage(App):
 
         self.saving = False
 
+    
     async def save(self):
         if self.saving or not self.row:
             return
 
         self.saving = True
+
+        previous_status = self.row["data"].get("status", "received")
+        new_status = self.status
+
         data = {}
 
         for key in self.row["data"]:
             data[key] = self.row["data"][key]
 
-        data["status"] = self.status
+        data["status"] = new_status
 
         try:
             updated = await workpeg.update_row(
@@ -237,6 +566,22 @@ class EmergencyCasePage(App):
             )
 
             self.show(updated)
+
+            if previous_status != new_status:
+                audit_error = await self.record_history(
+                    str(self.emergency_id),
+                    "status",
+                    "Emergency status changed.",
+                    previous_status,
+                    new_status,
+                )
+
+                if audit_error:
+                    toast("Status saved, but history failed: " + audit_error,
+                          kind="danger")
+
+                await self.load_history()
+
             toast("Emergency status updated", kind="success")
 
         except Exception as e:
@@ -244,54 +589,22 @@ class EmergencyCasePage(App):
 
         self.saving = False
 
-    def back(self):
-        navigate(biz_url("/dispatch"))
-
-    def save_button(self):
-        if self.saving:
-            return Button("Saving...", disabled=True)
-
-        return Button(
-            "Update case status",
-            on_click=self.save,
-        )
-
-    def assignment_button(self):
-        if self.saving:
-            return Button("Saving assignment...", disabled=True)
-
-        return Button(
-            "Save resource assignment",
-            on_click=self.save_assignment,
-        )
-
     def guest_panel(self):
         return Container(
             Column(
                 Text("Guest information", weight="semibold"),
                 Divider(),
-                Text("Guest / Patient", variant="muted"),
-                Text(
-                    str(
-                        self.row["data"].get(
-                            "guest_name", "Not provided"
-                        )
-                    )
-                ),
-                Text("Guest contact phone", variant="muted"),
-                Text(
-                    str(
-                        self.row["data"].get(
-                            "phone", "Not provided"
-                        )
-                    )
-                ),
+                Text("Guest or patient name", variant="muted"),
+                Text(str(self.row.get("data", {}).get("guest_name", "Not provided"))),
+                Text("Hotel room number", variant="muted"),
+                Text(str(self.row.get("data", {}).get("room_number", "Not provided"))),
+                Text("Contact phone number", variant="muted"),
+                Text(str(self.row.get("data", {}).get("phone", "Not provided"))),
                 gap=8,
             ),
             variant="card",
             padding=24,
         )
-
     def next_of_kin_panel(self):
         return Container(
             Column(
@@ -354,6 +667,75 @@ class EmergencyCasePage(App):
             padding=24,
         )
 
+    def first_aid_panel(self):
+        return Container(
+            Column(
+                Text("First-aid guidance", weight="semibold"),
+                Text(
+                    "Adult collapse — initial response",
+                    weight="medium",
+                ),
+                Divider(),
+                Text("1. Check the scene", weight="semibold"),
+                Text(
+                    "Make sure it is safe to approach. Do not enter "
+                    "an unsafe area. Ask someone nearby to assist."
+                ),
+                Text("2. Get emergency help", weight="semibold"),
+                Text(
+                    "Call emergency services immediately. In Nigeria, "
+                    "112 is listed by the Nigerian Communications "
+                    "Commission as the emergency services number. "
+                    "If the call does not connect, use your hotel's "
+                    "verified local emergency contact."
+                ),
+                Text(
+                    "3. Check responsiveness and breathing",
+                    weight="semibold",
+                ),
+                Text(
+                    "Speak loudly to the person and gently tap their "
+                    "shoulders. If they do not respond, assess whether "
+                    "they are breathing normally. Do not spend more "
+                    "than 10 seconds checking."
+                ),
+                Text(
+                    "4. If they are unresponsive and not breathing "
+                    "normally",
+                    weight="semibold",
+                ),
+                Text(
+                    "Tell the emergency call handler immediately. "
+                    "Start CPR promptly if you are able and willing, "
+                    "following the call handler's instructions. Ask "
+                    "someone to bring an AED and follow its voice prompts."
+                ),
+                Text("5. Stay with the person", weight="semibold"),
+                Text(
+                    "Continue monitoring them and report any changes "
+                    "to the emergency call handler. Continue until "
+                    "professional help takes over."
+                ),
+                Divider(),
+                Text(
+                    "IMPORTANT: This prototype guidance is for adult "
+                    "collapse only. Children and babies require "
+                    "age-specific instructions. It does not diagnose "
+                    "or replace emergency professionals. Local clinical "
+                    "review is required before operational use.",
+                    variant="muted",
+                ),
+                Text(
+                    "Reference: IFRC International First Aid, "
+                    "Resuscitation and Education Guidelines 2025. "
+                    "Nigeria emergency number reference: NCC.",
+                    variant="muted",
+                ),
+                gap=10,
+            ),
+            variant="card",
+            padding=24,
+        )
     def assignment_panel(self):
         return Container(
             Column(
@@ -389,7 +771,7 @@ class EmergencyCasePage(App):
                     + (self.ambulance_name or "Not assigned"),
                     weight="medium",
                 ),
-                self.assignment_button(),
+                Button("Save assignments", on_click=self.save_assignment),
                 Text(
                     "BETA DEMO: Assignments are saved inside HOPE. "
                     "No hospital or ambulance is contacted or dispatched.",
@@ -421,7 +803,7 @@ class EmergencyCasePage(App):
                     on_change=self.set_status,
                     label="Emergency status",
                 ),
-                Row(Spacer(), self.save_button()),
+                Row(Spacer(), Button("Save status", on_click=self.save)),
                 gap=16,
             ),
             variant="card",
@@ -485,10 +867,13 @@ class EmergencyCasePage(App):
                 ),
                 self.guest_panel(),
                 self.next_of_kin_panel(),
-                self.emergency_panel(),
+                self.emergency_panel(),
+                self.first_aid_panel(),
                 self.assignment_panel(),
                 self.status_panel(),
+                self.history_panel(),
                 height="100%",
                 padding=24,
                 gap=24,
             )
+

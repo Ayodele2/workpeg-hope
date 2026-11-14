@@ -1,18 +1,33 @@
+
 """HOPE emergency response history helpers."""
 
 from workpeg.ui import workpeg, user
 
 
 TABLE_NAMESPACE = "emergency_history"
+PAGE_SIZE = 100
+MAX_SCAN_PAGES = 10
+MAX_CASE_EVENTS = 100
 
 
-async def ensure_history_table():
-    """Find or create the current business's history table."""
+async def find_history_table():
+    """Find the current business's history table without creating it."""
 
     tables = await workpeg.get_tables(TABLE_NAMESPACE)
 
     if len(tables) > 0:
         return tables[0]["uuid"]
+
+    return ""
+
+
+async def ensure_history_table():
+    """Find or safely create the current business's history table."""
+
+    existing = await find_history_table()
+
+    if existing:
+        return existing
 
     try:
         made = await workpeg.create_table({
@@ -71,11 +86,11 @@ async def ensure_history_table():
         return made["uuid"]
 
     except Exception:
-        # Another staff member may have created the table.
-        tables = await workpeg.get_tables(TABLE_NAMESPACE)
+        # Another staff member may have created the table concurrently.
+        existing = await find_history_table()
 
-        if len(tables) > 0:
-            return tables[0]["uuid"]
+        if existing:
+            return existing
 
         raise
 
@@ -87,7 +102,7 @@ async def record_history(
     previous_value="",
     new_value="",
 ):
-    """Record one event without hiding errors from the calling page."""
+    """Record one event and return an error message if it fails."""
 
     try:
         table = await ensure_history_table()
@@ -95,6 +110,7 @@ async def record_history(
         latest = await workpeg.get_rows(
             table,
             limit=1,
+            offset=0,
         )
 
         top = (
@@ -123,16 +139,46 @@ async def record_history(
 
 
 async def get_case_history(case_id):
-    """Return history events belonging to one emergency case."""
+    """Return a case's newest-first history and whether results are limited."""
 
-    table = await ensure_history_table()
+    table = await find_history_table()
 
-    rows = await workpeg.get_rows(
-        table,
-        limit=100,
-    )
+    if not table:
+        return {
+            "events": [],
+            "has_more": False,
+        }
 
-    return [
-        row for row in rows
-        if row["data"].get("case_id", "") == str(case_id)
-    ]
+    events = []
+    has_more = False
+
+    for page in range(MAX_SCAN_PAGES):
+        rows = await workpeg.get_rows(
+            table,
+            limit=PAGE_SIZE,
+            offset=page * PAGE_SIZE,
+        )
+
+        for row in rows:
+            data = row.get("data", {})
+
+            if data.get("case_id", "") == str(case_id):
+                events.append(row)
+
+                if len(events) >= MAX_CASE_EVENTS:
+                    has_more = True
+                    break
+
+        if has_more:
+            break
+
+        if len(rows) < PAGE_SIZE:
+            break
+
+        if page == MAX_SCAN_PAGES - 1:
+            has_more = True
+
+    return {
+        "events": events,
+        "has_more": has_more,
+    }

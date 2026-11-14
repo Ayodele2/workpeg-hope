@@ -1,5 +1,5 @@
 
-"""HOPE Response Resources: hospitals and ambulances."""
+"""HOPE Hotel Medical Resources Register."""
 
 from workpeg.ui import (
     App, State, Padding, Column, Row, Spacer, Text, Button,
@@ -36,8 +36,8 @@ class ResourcesPage(App):
     status = State("available")
 
     async def on_mount(self):
-        store.page_title = "Response Resources"
-        set_title("HOPE | Response Resources")
+        store.page_title = "Medical Resources"
+        set_title("HOPE | Medical Resources")
         on_table_change(self.changed)
         await self.load()
 
@@ -152,7 +152,7 @@ class ResourcesPage(App):
             self.table = made["uuid"]
             self.ready = True
             self.needs_setup = False
-            toast("Response resources register created", kind="success")
+            toast("Medical resources register created", kind="success")
 
         except Exception as e:
             await self.find_table()
@@ -281,7 +281,7 @@ class ResourcesPage(App):
 
     def body(self):
         if self.loading:
-            return LoadingState("Loading response resources...")
+            return LoadingState("Loading medical resources...")
 
         elif self.error != "":
             return ErrorState(
@@ -317,8 +317,8 @@ class ResourcesPage(App):
         elif len(self.rows) == 0:
             return EmptyState(
                 "building-2",
-                "No response resources registered",
-                "Add your first hospital or ambulance.",
+                "No medical resources registered",
+                "Register a hospital or ambulance provider to populate this list.",
                 Button(
                     "Register resource",
                     icon="plus",
@@ -366,7 +366,7 @@ class ResourcesPage(App):
                     )
                     for r in self.rows
                 ],
-                search="Search response resources",
+                search="Search medical resources",
                 sortable=True,
                 footer=self.footer(),
             )
@@ -397,8 +397,8 @@ class ResourcesPage(App):
         return Padding(
             Column(
                 PageHeader(
-                    "Response Resources",
-                    "Manage hospitals and ambulance resources.",
+                    "Medical Resources",
+                    "View registered hospitals and ambulance providers available to support hotel emergencies.",
                     Button(
                         "Register resource",
                         icon="plus",
@@ -416,7 +416,7 @@ class ResourcesPage(App):
                     self.add_form(),
                     open=self.adding,
                     on_close=self.close_add,
-                    title="Register a response resource",
+                    title="Register a medical resource",
                 ),
                 gap=24,
             ),
