@@ -1,0 +1,14 @@
+{
+  "namespace": "hope",
+  "sdk": "0.163.0",
+  "function": {
+    "entrypoint": "app.main:main"
+  },
+  "runtime": {
+    "default": "docker",
+    "docker": {
+      "host": "127.0.0.1",
+      "port": 8000
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "page": {
+    "app_name": "Main",
+    "chrome_source": "auto",
+    "fonts": null,
+    "icons_href": "/icons.css",
+    "icons_ver": "4ff65a35",
+    "peg_namespace": "hope",
+    "uses_chrome": true,
+    "uses_icons": true,
+    "uses_rtc": false,
+    "ver": "8bfc723a"
+  },
+  "sdk": "0.163.0"
+}
